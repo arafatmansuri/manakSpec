@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+python-dotenv
+fastembed
+psycopg2-binary
+pgvector
+google-genai
+pydantic

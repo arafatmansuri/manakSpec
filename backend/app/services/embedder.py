@@ -1,18 +1,25 @@
-from fastembed import TextEmbedding
+from google import genai
+from google.genai import types
+from app.core.config import settings
 from typing import List
 
-class EmbeddingService:
+class GeminiEmbedderService:
     def __init__(self):
-        print("Loading local FastEmbed model (BAAI/bge-small-en-v1.5)...")
-        # Downloads/loads ~130MB ONNX lightweight model locally
-        self.model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     def generate_embedding(self, text: str) -> List[float]:
-        """Generates a 384-dimensional vector for input text."""
+        """Generates a 768-dim vector using gemini-embedding-001."""
         if not text or not text.strip():
-            # Return zero vector fallback
-            return [0.0] * 384
-        embeddings = list(self.model.embed([text]))
-        return embeddings[0].tolist()
+            return [0.0] * 768
 
-embedder = EmbeddingService()
+        response = self.client.models.embed_content(
+            model=settings.EMBEDDING_MODEL,
+            contents=text,
+            config=types.EmbedContentConfig(
+                output_dimensionality=768,
+                task_type="RETRIEVAL_DOCUMENT"
+            )
+        )
+        return response.embeddings[0].values
+
+gemini_embedder = GeminiEmbedderService()

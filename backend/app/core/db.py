@@ -1,12 +1,24 @@
-import psycopg2
-from pgvector.psycopg2 import register_vector
+import asyncpg
 from app.core.config import settings
+from typing import AsyncGenerator
 
-def get_db_connection():
-    try:
-        conn = psycopg2.connect(settings.DATABASE_URL)
-        register_vector(conn)
-        return conn
-    except Exception as e:
-        print(f"Error connecting to PostgreSQL database: {e}")
-        raise e
+class Database:
+    def __init__(self):
+        self.pool: asyncpg.Pool | None = None
+
+    async def connect(self):
+        self.pool = await asyncpg.create_pool(
+            dsn=settings.DATABASE_URL,
+            min_size=2,
+            max_size=10
+        )
+
+    async def disconnect(self):
+        if self.pool:
+            await self.pool.close()
+
+db = Database()
+
+async def get_db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
+    async with db.pool.acquire() as connection:
+        yield connection

@@ -1,4 +1,5 @@
 import json
+import re
 import asyncpg
 from typing import Optional, Dict, Any
 from app.services.parser import document_parser
@@ -6,6 +7,35 @@ from app.services.extractor import bis_extractor
 from app.services.embedder import gemini_embedder
 
 class BISIngestionService:
+    @staticmethod
+    def _sanitize_committee_code(committee_code: Optional[str]) -> Optional[str]:
+        """Validates if code matches valid BIS committee format (e.g., ETD 23, CED 2).
+        If extracted text is an IS standard or ICS code, returns None."""
+        if not committee_code:
+            return None
+        
+        cleaned = committee_code.strip()
+        # Filter out IS standard numbers or ICS classifications wrongly parsed as committee codes
+        if re.match(r'^(IS|ICS)\b', cleaned, re.IGNORECASE):
+            return None
+            
+        return cleaned
+
+    async def _ensure_committee_exists(self, conn: asyncpg.Connection, committee_code: Optional[str]):
+        """Ensures the committee code exists in bis_committees before standard insertion."""
+        if not committee_code:
+            return
+            
+        await conn.execute(
+            """
+            INSERT INTO bis_committees (committee_code, committee_name)
+            VALUES ($1, $2)
+            ON CONFLICT (committee_code) DO NOTHING;
+            """,
+            committee_code,
+            f"Technical Committee {committee_code}"
+        )
+
     async def ingest_document(
         self,
         conn: asyncpg.Connection,
@@ -16,18 +46,11 @@ class BISIngestionService:
         parent_is_number: Optional[str] = None,
         manual_overrides: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Unified Ingestion Pipeline:
-        - Handles both PDF and JSON files.
-        - Validates extraction quality.
-        - Distinguishes Base Standards from Amendments.
-        - Populates relational metadata and dynamic JSONB technical specifications.
-        """
         manual_overrides = manual_overrides or {}
         raw_text = ""
         tech_specs: Dict[str, Any] = {}
 
-        # 1. FILE INSPECTION & PARSING (JSON vs PDF)
+        # 1. FILE INSPECTION & PARSING
         if filename.lower().endswith(".json") or json_payload:
             payload = json_payload or json.loads(file_bytes.decode("utf-8"))
             is_number = payload.get("is_number") or manual_overrides.get("is_number")
@@ -42,18 +65,15 @@ class BISIngestionService:
             tech_specs = payload.get("technical_specifications", {})
             relations_data = payload.get("relations", [])
         else:
-            # Handle PDF Ingestion
             if filename.lower().endswith(".pdf") or not filename:
                 raw_text = document_parser.extract_text_from_pdf(file_bytes)
             else:
                 raw_text = document_parser.extract_text_from_image(file_bytes)
 
-            # Quality Check
             is_valid, failure_reason = bis_extractor.validate_text_quality(raw_text)
             if not is_valid:
                 raise ValueError(f"Quality Check Failed: {failure_reason}")
 
-            # Extract Metadata
             is_number = manual_overrides.get("is_number") or bis_extractor.extract_is_number(raw_text) or "IS UNKNOWN"
             publication_year = manual_overrides.get("publication_year") or bis_extractor.extract_publication_year(raw_text, is_number)
             title = manual_overrides.get("title") or f"Indian Standard {is_number}"
@@ -69,17 +89,21 @@ class BISIngestionService:
             tech_specs = manual_overrides.get("technical_specifications", {})
             relations_data = bis_extractor.extract_annex_a_references(raw_text)
 
-        # 2. EMBEDDING GENERATION
-        embedding = await gemini_embedder.pipeline_gemini_embedder(scope_text)
+        # 2. SANITIZE & ENSURE COMMITTEE CODE
+        committee_code = self._sanitize_committee_code(committee_code)
+        if committee_code:
+            await self._ensure_committee_exists(conn, committee_code)
+
+        # 3. EMBEDDING GENERATION
+        embedding = gemini_embedder.generate_embedding(scope_text)
         vector_str = "[" + ",".join(map(str, embedding)) + "]"
 
-        # 3. ROUTING BY RELATION TYPE (Amendment vs Base Standard)
+        # 4. ROUTING BY RELATION TYPE
         explicit_relation = relation_type or manual_overrides.get("relation_type")
 
         if explicit_relation == "Amendment" or parent_is_number:
             target_parent = parent_is_number or is_number
             
-            # Insert record into standard_relations instead of overwriting base standard
             await conn.execute(
                 """
                 INSERT INTO standard_relations (parent_is_number, relation_type, related_is_number, title_or_description)
@@ -88,7 +112,6 @@ class BISIngestionService:
                 target_parent, "Amendment", is_number, title
             )
             
-            # Update latest amendment info on parent standard
             await conn.execute(
                 """
                 UPDATE indian_standards 
@@ -105,7 +128,7 @@ class BISIngestionService:
                 "amendment_is_number": is_number
             }
 
-        # 4. BASE STANDARD UPSERT (Primary Table)
+        # 5. BASE STANDARD UPSERT
         upsert_sql = """
             INSERT INTO indian_standards (
                 is_number, title, publication_year, status, scope_text, 
@@ -133,9 +156,8 @@ class BISIngestionService:
             reaffirmation_year, json.dumps(tech_specs), vector_str
         )
 
-        # 5. TARGETED RELATIONS UPDATE (Prevents Relational Overwrites)
+        # 6. TARGETED RELATIONS UPDATE
         if relations_data:
-            # Delete ONLY Normative References for this parent (preserves Amendments, Safety Codes, etc.)
             await conn.execute(
                 """
                 DELETE FROM standard_relations 

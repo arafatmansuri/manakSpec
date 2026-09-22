@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     
     # Groq Fallback Settings
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    FALLBACK_LLM_MODEL: str = "llama-3.3-70b-versatile"
+    FALLBACK_LLM_MODEL: str = "openai/gpt-oss-120b"
 
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 

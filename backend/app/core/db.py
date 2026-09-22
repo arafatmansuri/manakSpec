@@ -19,6 +19,14 @@ class Database:
 
 db = Database()
 
+async def get_db_pool() -> asyncpg.Pool:
+    """Dependency helper to inject the connection pool into background workers."""
+    if db.pool is None:
+        raise RuntimeError("Database connection pool is not initialized.")
+    return db.pool
+
 async def get_db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
+    if db.pool is None:
+        raise RuntimeError("Database connection pool is not initialized.")
     async with db.pool.acquire() as connection:
         yield connection

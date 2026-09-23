@@ -2,11 +2,12 @@ import io
 import zipfile
 import uuid
 import json
+from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, BackgroundTasks
 from asyncpg import Connection, Pool
 from typing import Dict, Optional, Any, List
 from app.core.db import get_db_connection,get_db_pool
-from app.schemas.response import RecommendationOutput
+from app.schemas.response import RecommendationOutput,ChatHistoryResponse,CreateSessionRequest,CreateSessionResponse,SessionSummary,ChatMessageSchema
 from app.services.session_service import session_service
 from app.services.parser import document_parser
 from app.services.ingester import bis_ingester
@@ -15,10 +16,11 @@ from app.agent.workflow import agent_executor
 router = APIRouter()
 
 @router.post("/recommend", response_model=RecommendationOutput)
-async def recommend_standards(
-    query_text: Optional[str] = Form(None, description="Optional text query or prompt"),
-    session_id: Optional[str] = Form(None, description="Optional UUID to continue chat session"),
-    file: Optional[UploadFile] = File(None, description="Optional PDF or image upload"),
+async def recommend(
+    session_id: str = Form(..., description="UUID of the active chat session"),
+    user_id: str = Form(..., description="User ID associated with the session"),
+    query_text: Optional[str] = Form(None, description="Optional text query or procurement prompt"),
+    file: Optional[UploadFile] = File(None, description="Optional PDF or image tender document upload"),
     conn: Connection = Depends(get_db_connection)
 ):
     if not query_text and not file:
@@ -29,6 +31,7 @@ async def recommend_standards(
 
     extracted_file_text = ""
     
+    # 1. Document Extraction
     if file:
         contents = await file.read()
         filename = file.filename.lower() if file.filename else ""
@@ -49,6 +52,7 @@ async def recommend_standards(
                 detail="Could not extract legible text from the uploaded document."
             )
 
+    # 2. Combine Inputs into Prompt
     combined_query_parts = []
     if query_text and query_text.strip():
         combined_query_parts.append(f"User Instruction: {query_text.strip()}")
@@ -58,10 +62,18 @@ async def recommend_standards(
     full_prompt = "\n\n".join(combined_query_parts)
 
     try:
-        active_session_id = await session_service.get_or_create_session(conn, session_id)
+        # 3. Retrieve Session & Chat History
+        session_info = await session_service.get_or_create_session(conn, session_id, user_id)
+        active_session_id = session_info["session_id"]
+        verified_user_id = session_info["user_id"]
+        current_title = session_info.get("title", "New Chat")
+
         chat_history = await session_service.get_recent_history(conn, active_session_id)
+        
+        # Log User Query
         await session_service.save_message(conn, active_session_id, "user", full_prompt)
 
+        # 4. Invoke Agent Execution Graph
         initial_state = {
             "raw_query": full_prompt,
             "chat_history": chat_history,
@@ -75,15 +87,32 @@ async def recommend_standards(
         result = await agent_executor.ainvoke(initial_state)
         structured_synthesis = result["final_output"]
 
+        # 5. Auto-Title Session (First Turn Check)
+        if current_title in [None, "New Chat", ""]:
+            primary_stds = result["retrieved_data"].get("primary_standards", [])
+            if primary_stds and len(primary_stds) > 0:
+                top_std = primary_stds[0]
+                std_num = top_std.get("is_number", "")
+                std_title = top_std.get("title", "")[:30]
+                new_title = f"{std_num} - {std_title}".strip(" -")
+            else:
+                raw_prompt = query_text or "Document Procurement Query"
+                new_title = raw_prompt[:35] + "..." if len(raw_prompt) > 35 else raw_prompt
+
+            await session_service.update_session_title(conn, active_session_id, new_title)
+
+        # 6. Log Assistant Synthesis
         await session_service.save_message(
             conn, 
             active_session_id, 
             "assistant", 
-            structured_synthesis.model_dump_json()
+            structured_synthesis.model_dump_json(),
         )
 
+        # 7. Construct & Return Final Output Payload
         return RecommendationOutput(
             session_id=active_session_id,
+            user_id=verified_user_id,
             query_expansion_used=result["expanded_query"],
             primary_standards=result["retrieved_data"]["primary_standards"],
             allied_references=result["retrieved_data"]["allied_references"],
@@ -96,7 +125,6 @@ async def recommend_standards(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing procurement request: {str(e)}"
         )
-
 # In-memory status store for bulk jobs
 ingestion_jobs_db: Dict[str, Dict[str, Any]] = {}
 
@@ -268,3 +296,122 @@ async def get_bulk_ingestion_status(job_id: str):
     if not job_status:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job ID not found.")
     return job_status
+
+@router.post("/sessions", response_model=CreateSessionResponse, status_code=status.HTTP_201_CREATED)
+async def create_session(
+    payload: CreateSessionRequest,
+    conn: Connection = Depends(get_db_connection)
+):
+    """
+    Initializes a new user_id if not provided, creates a new chat session in Postgres,
+    and returns the session details.
+    """
+    user_id = payload.user_id or str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
+    title = payload.title or "New Chat"
+
+    # 1. Insert or ensure user exists in users table (if applicable)
+    upsert_user_sql = """
+        INSERT INTO users (user_id) 
+        VALUES ($1) 
+        ON CONFLICT (user_id) DO NOTHING;
+    """
+    await conn.execute(upsert_user_sql, user_id)
+
+    # 2. Insert new session record
+    create_session_sql = """
+        INSERT INTO chat_sessions (session_id, user_id, title, created_at, updated_at)
+        VALUES ($1, $2, $3, NOW(), NOW())
+        RETURNING created_at;
+    """
+    created_at = await conn.fetchval(create_session_sql, session_id, user_id, title)
+
+    return CreateSessionResponse(
+        user_id=user_id,
+        session_id=session_id,
+        title=title,
+        created_at=created_at
+    )
+
+
+@router.get("/users/{user_id}/sessions", response_model=List[SessionSummary])
+async def get_user_sessions(
+    user_id: str,
+    conn: Connection = Depends(get_db_connection)
+):
+    """
+    Retrieves all historical chat sessions for a specific user to populate the sidebar.
+    """
+    fetch_sessions_sql = """
+        SELECT 
+            session_id, 
+            title, 
+            created_at, 
+            updated_at
+        FROM chat_sessions
+        WHERE user_id = $1
+        ORDER BY updated_at DESC;
+    """
+    rows = await conn.fetch(fetch_sessions_sql, user_id)
+
+    return [
+        SessionSummary(
+            session_id=row["session_id"],
+            title=row["title"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"]
+        )
+        for row in rows
+    ]
+
+
+@router.get("/sessions/{session_id}/messages", response_model=ChatHistoryResponse)
+async def get_session_chat_history(
+    session_id: str,
+    conn: Connection = Depends(get_db_connection)
+):
+    """
+    Fetches the session title and all chronological chat messages for a specific thread.
+    """
+    # 1. Fetch session title and verify existence
+    fetch_session_sql = """
+        SELECT title FROM chat_sessions WHERE session_id = $1;
+    """
+    title = await conn.fetchval(fetch_session_sql, session_id)
+
+    if title is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session with ID '{session_id}' was not found."
+        )
+
+    # 2. Fetch messages ordered chronologically
+    fetch_messages_sql = """
+        SELECT 
+            message_id, 
+            role, 
+            content, 
+            execution_provider, 
+            created_at
+        FROM chat_messages
+        WHERE session_id = $1
+        ORDER BY created_at ASC;
+    """
+    rows = await conn.fetch(fetch_messages_sql, session_id)
+
+    messages = [
+        ChatMessageSchema(
+            message_id=row["message_id"],
+            role=row["role"],
+            content=row["content"],
+            execution_provider=row["execution_provider"],
+            created_at=row["created_at"]
+        )
+        for row in rows
+    ]
+
+    return ChatHistoryResponse(
+        session_id=session_id,
+        title=title,
+        messages=messages
+    )

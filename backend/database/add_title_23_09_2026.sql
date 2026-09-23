@@ -1,0 +1,2 @@
+ALTER TABLE chat_sessions 
+ADD COLUMN IF NOT EXISTS title VARCHAR(255) DEFAULT 'New Chat';

@@ -1,6 +1,50 @@
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 import json
 from pydantic import BaseModel, Field, field_validator
+
+
+# --- Session & History Schemas ---
+class CreateSessionRequest(BaseModel):
+    user_id: Optional[str] = None
+    title: Optional[str] = "New Chat"
+
+
+class CreateSessionResponse(BaseModel):
+    user_id: str
+    session_id: str
+    title: str
+    created_at: datetime
+
+
+class SessionSummary(BaseModel):
+    session_id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChatMessageSchema(BaseModel):
+    message_id: str
+    role: str
+    content: Any  # Accepts JSON string or parsed dict
+    execution_provider: Optional[str] = None
+    created_at: datetime
+
+    @field_validator("content", mode="before")
+    def parse_json_content(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return v
+        return v
+
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    title: str
+    messages: List[ChatMessageSchema]
 
 class PrimaryStandardSchema(BaseModel):
     is_number: str = Field(..., description="IS standard number, e.g., IS 16106:2023")
@@ -67,6 +111,7 @@ class StructuredSynthesisSchema(BaseModel):
 
 class RecommendationOutput(BaseModel):
     session_id: str = Field(..., description="UUID of the chat session where this message was logged")
+    user_id: str = Field(..., description="User ID associated with the session")
     query_expansion_used: str
     primary_standards: List[PrimaryStandardSchema]
     allied_references: List[AlliedReferenceSchema]

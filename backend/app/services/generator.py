@@ -60,7 +60,6 @@ class SynthesisGeneratorService:
         Primary Standards: {context.get('primary_standards', [])}
         Allied References: {context.get('allied_references', [])}
         """
-
         # Prepare Gemini-safe schema by scrubbing additionalProperties
         raw_schema = StructuredSynthesisSchema.model_json_schema()
         gemini_safe_schema = _clean_schema_additional_properties(raw_schema)
@@ -80,35 +79,35 @@ class SynthesisGeneratorService:
             return structured_data, "Google Gemini API"
 
         except Exception as gemini_err:
-            # 2. Failover to Groq API with JSON mode
-            try:
-                # Provide explicit schema in failover prompt to prevent structure mismatch
-                json_schema_str = json.dumps(raw_schema)
-                groq_system_msg = (
-                    f"{self._build_system_instruction()}\n"
-                    f"Required Output JSON Schema:\n{json_schema_str}\n"
-                    "Return ONLY valid JSON matching this schema."
-                )
+            print(f"Gemini Error: {str(gemini_err)}\n")
+        # 2. Failover Execution via Groq API with Explicit Schema Enforcement
+        try:
+            # Provide explicit schema in failover prompt to prevent structure mismatch
+            json_schema_str = json.dumps(raw_schema)
+            groq_system_msg = (
+                f"{self._build_system_instruction()}\n"
+                f"Required Output JSON Schema:\n{json_schema_str}\n"
+                "Return ONLY valid JSON matching this schema."
+            )
 
-                failover_model = getattr(settings, "FAILOVER_LLM_MODEL", None) or getattr(settings, "FALLBACK_LLM_MODEL", "llama-3.3-70b-versatile")
+            failover_model = getattr(settings, "FAILOVER_LLM_MODEL", None) or getattr(settings, "FALLBACK_LLM_MODEL", "llama-3.3-70b-versatile")
 
-                groq_response = self.groq_client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": groq_system_msg},
-                        {"role": "user", "content": f"{self._build_prompt(query, context, history)}\n\n{prompt}"}
-                    ],
-                    model=failover_model,
-                    response_format={"type": "json_object"}
-                )
-                raw_json = groq_response.choices[0].message.content
-                structured_data = StructuredSynthesisSchema.model_validate_json(raw_json)
-                return structured_data, f"Groq API Failover ({failover_model})"
-                
-            except Exception as groq_err:
-                raise RuntimeError(
-                    f"Both Primary and Failover providers failed:\n"
-                    f"Gemini Error: {str(gemini_err)}\n"
-                    f"Groq Error: {str(groq_err)}"
-                )
+            groq_response = self.groq_client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": groq_system_msg},
+                    {"role": "user", "content": f"{self._build_prompt(query, context, history)}\n\n{prompt}"}
+                ],
+                model=failover_model,
+                response_format={"type": "json_object"}
+            )
+            raw_json = groq_response.choices[0].message.content
+            structured_data = StructuredSynthesisSchema.model_validate_json(raw_json)
+            return structured_data, f"Groq API Failover ({failover_model})"
+            
+        except Exception as groq_err:
+            raise RuntimeError(
+                f"Both Primary and Failover providers failed:\n"
+                f"Groq Error: {str(groq_err)}"
+            )
 
 generator_service = SynthesisGeneratorService()

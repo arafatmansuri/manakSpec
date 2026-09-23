@@ -20,7 +20,7 @@ class CreateSessionResponse(BaseModel):
 class SessionSummary(BaseModel):
     session_id: str
     title: str
-    created_at: datetime
+    created_at: datetime    
     updated_at: datetime
 
 
@@ -113,7 +113,7 @@ class RecommendationOutput(BaseModel):
     session_id: str = Field(..., description="UUID of the chat session where this message was logged")
     user_id: str = Field(..., description="User ID associated with the session")
     query_expansion_used: str
-    primary_standards: List[PrimaryStandardSchema]
+    # primary_standards: List[PrimaryStandardSchema]
     allied_references: List[AlliedReferenceSchema]
     structured_synthesis: StructuredSynthesisSchema
     execution_provider: str

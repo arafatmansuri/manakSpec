@@ -1,8 +1,8 @@
 import React from 'react'
-import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { useAppDispatch } from '@/store/hooks'
 import { toggleSidebar, setActiveModal } from '@/store/slices/uiSlice'
-import { setPreferredLanguage } from '@/store/slices/sessionSlice'
-import { Menu, Globe, ShieldCheck, Sparkles, BookOpen, Clock, UploadCloud } from 'lucide-react'
+// import { setPreferredLanguage } from '@/store/slices/sessionSlice'
+import { Menu, ShieldCheck, Sparkles, BookOpen, Clock, UploadCloud } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 export const LANGUAGES = [
@@ -17,7 +17,7 @@ export const LANGUAGES = [
 
 export const Header: React.FC = () => {
   const dispatch = useAppDispatch()
-  const preferredLanguage = useAppSelector((state) => state.session.preferredLanguage)
+  // const preferredLanguage = useAppSelector((state) => state.session.preferredLanguage)
   const location = useLocation()
 
   return (
@@ -55,33 +55,30 @@ export const Header: React.FC = () => {
         <nav className="hidden lg:flex items-center gap-1 mr-2">
           <Link
             to="/"
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-              location.pathname === '/' || location.pathname.startsWith('/chat')
-                ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200/60'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${location.pathname === '/' || location.pathname.startsWith('/chat')
+              ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200/60'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>Assistant</span>
           </Link>
           <Link
             to="/standards"
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-              location.pathname === '/standards'
-                ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200/60'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${location.pathname === '/standards'
+              ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200/60'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
           >
             <BookOpen className="w-3.5 h-3.5 text-blue-600" />
             <span>BIS Catalog</span>
           </Link>
           <Link
             to="/history"
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-              location.pathname === '/history'
-                ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200/60'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${location.pathname === '/history'
+              ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200/60'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
           >
             <Clock className="w-3.5 h-3.5 text-amber-600" />
             <span>Procurement History</span>

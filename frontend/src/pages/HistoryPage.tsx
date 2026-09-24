@@ -2,18 +2,21 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { setActiveSessionId } from '@/store/slices/sessionSlice'
-import { useUserSessions, useCreateSession } from '@/hooks/useSessions'
+import { addToast } from '@/store/slices/uiSlice'
+import { useUserSessions, useCreateSession, useDeleteSession } from '@/hooks/useSessions'
 import { useExport } from '@/hooks/useExport'
 import { Card } from '@/components/common/Card'
 import { Button } from '@/components/common/Button'
-import { Clock, MessageSquare, ArrowRight, FileDown, Plus, Search, Calendar, ChevronDown } from 'lucide-react'
+import { Clock, MessageSquare, ArrowRight, FileDown, Plus, Search, Calendar, ChevronDown, Trash2 } from 'lucide-react'
 
 export const HistoryPage: React.FC = () => {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const userId = useAppSelector((state) => state.session.userId)
+  const activeSessionId = useAppSelector((state) => state.session.activeSessionId)
   const { data: sessions, isLoading } = useUserSessions(userId)
   const createSessionMutation = useCreateSession()
+  const deleteSessionMutation = useDeleteSession(userId)
   const { exportDocument, isExporting } = useExport()
   const [search, setSearch] = useState('')
   const [openExportMenuId, setOpenExportMenuId] = useState<string | null>(null)
@@ -21,6 +24,19 @@ export const HistoryPage: React.FC = () => {
   const handleOpenSession = (sessionId: string) => {
     dispatch(setActiveSessionId(sessionId))
     navigate(`/chat/${sessionId}`)
+  }
+
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation()
+    try {
+      await deleteSessionMutation.mutateAsync(sessionId)
+      dispatch(addToast({ message: 'Consultation deleted successfully.', type: 'success' }))
+      if (sessionId === activeSessionId) {
+        dispatch(setActiveSessionId(null))
+      }
+    } catch (err: any) {
+      dispatch(addToast({ message: `Failed to delete session: ${err.message}`, type: 'error' }))
+    }
   }
 
   const handleNewChat = async () => {
@@ -169,9 +185,20 @@ export const HistoryPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1 text-xs font-semibold text-blue-600 group-hover:translate-x-1 transition-transform">
-                  <span>Resume</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteSession(e, session.session_id)}
+                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                    title="Delete consultation"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="flex items-center gap-1 text-xs font-semibold text-blue-600 group-hover:translate-x-1 transition-transform">
+                    <span>Resume</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
                 </div>
               </div>
             </Card>

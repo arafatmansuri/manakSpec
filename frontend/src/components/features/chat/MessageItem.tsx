@@ -45,10 +45,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, sessionId }) 
   }
 
   if (isUser) {
+    const displayContent =
+      typeof message.content === 'string'
+        ? message.content.replace(/^User Instruction:\s*/i, '')
+        : message.content
+
     return (
       <div className="flex items-start justify-end gap-3 max-w-4xl mx-auto w-full animate-in fade-in duration-200">
         <div className="max-w-2xl rounded-2xl bg-blue-600 text-white p-4 shadow-sm border border-blue-700">
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayContent}</p>
           <span className="text-[10px] text-blue-100 mt-2 block text-right font-medium">
             {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>

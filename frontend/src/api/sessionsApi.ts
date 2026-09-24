@@ -21,4 +21,9 @@ export const sessionsApi = {
     const res = await apiClient.get<ChatHistoryResponse>(`/sessions/chat/${sessionId}`)
     return res.data
   },
+
+  deleteSession: async (sessionId: string): Promise<{ status: string; message: string }> => {
+    const res = await apiClient.delete<{ status: string; message: string }>(`/sessions/${sessionId}`)
+    return res.data
+  },
 }

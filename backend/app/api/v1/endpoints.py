@@ -60,7 +60,7 @@ async def recommend(
     # 2. Combine Inputs into Prompt
     combined_query_parts = []
     if query_text and query_text.strip():
-        combined_query_parts.append(f"User Instruction: {query_text.strip()}")
+        combined_query_parts.append(query_text.strip())
     if extracted_file_text and extracted_file_text.strip():
         combined_query_parts.append(f"Extracted Document Content:\n{extracted_file_text.strip()}")
     

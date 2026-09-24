@@ -32,3 +32,16 @@ export function useCreateSession() {
     },
   })
 }
+
+export function useDeleteSession(userId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (sessionId: string) => sessionsApi.deleteSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.sessions(userId),
+      })
+    },
+  })
+}

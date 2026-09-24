@@ -122,3 +122,31 @@ async def get_session_chat_history(
         title=title,
         messages=messages
     )
+
+
+@router.delete("/{session_id}", status_code=status.HTTP_200_OK)
+async def delete_session(
+    session_id: str,
+    conn: Connection = Depends(get_db_connection)
+):
+    """
+    Deletes a chat session and all its associated chat messages.
+    """
+    session_exists = await conn.fetchval(
+        "SELECT 1 FROM chat_sessions WHERE session_id = $1;",
+        session_id
+    )
+    if not session_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session with ID '{session_id}' was not found."
+        )
+
+    await conn.execute("DELETE FROM chat_messages WHERE session_id = $1;", session_id)
+    await conn.execute("DELETE FROM chat_sessions WHERE session_id = $1;", session_id)
+
+    return {
+        "status": "success",
+        "message": f"Session '{session_id}' deleted successfully.",
+        "session_id": session_id
+    }

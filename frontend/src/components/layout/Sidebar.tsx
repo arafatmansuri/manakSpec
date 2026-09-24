@@ -1,10 +1,10 @@
 import React from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
-import { setSidebarOpen, setActiveModal } from '@/store/slices/uiSlice'
+import { setSidebarOpen, setActiveModal, addToast } from '@/store/slices/uiSlice'
 import { setActiveSessionId } from '@/store/slices/sessionSlice'
-import { useUserSessions, useCreateSession } from '@/hooks/useSessions'
-import { Plus, MessageSquare, BookOpen, Clock, ShieldCheck, FileCheck2, X, ChevronRight, UploadCloud } from 'lucide-react'
+import { useUserSessions, useCreateSession, useDeleteSession } from '@/hooks/useSessions'
+import { Plus, MessageSquare, BookOpen, Clock, ShieldCheck, FileCheck2, X, UploadCloud, Trash2 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 export const Sidebar: React.FC = () => {
@@ -14,9 +14,11 @@ export const Sidebar: React.FC = () => {
 
   const isSidebarOpen = useAppSelector((state) => state.ui.isSidebarOpen)
   const userId = useAppSelector((state) => state.session.userId)
+  const activeSessionId = useAppSelector((state) => state.session.activeSessionId)
 
   const { data: sessions, isLoading } = useUserSessions(userId)
   const createSessionMutation = useCreateSession()
+  const deleteSessionMutation = useDeleteSession(userId)
 
   const handleNewChat = async () => {
     try {
@@ -39,6 +41,20 @@ export const Sidebar: React.FC = () => {
     navigate(`/chat/${id}`)
     if (window.innerWidth < 1024) {
       dispatch(setSidebarOpen(false))
+    }
+  }
+
+  const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    try {
+      await deleteSessionMutation.mutateAsync(id)
+      dispatch(addToast({ message: 'Session deleted successfully.', type: 'success' }))
+      if (id === activeSessionId || id === sessionId) {
+        dispatch(setActiveSessionId(null))
+        navigate('/')
+      }
+    } catch (err: any) {
+      dispatch(addToast({ message: `Delete failed: ${err.message}`, type: 'error' }))
     }
   }
 
@@ -133,17 +149,17 @@ export const Sidebar: React.FC = () => {
             sessions.map((s) => {
               const isActive = sessionId === s.session_id
               return (
-                <button
+                <div
                   key={s.session_id}
                   onClick={() => handleSelectSession(s.session_id)}
                   className={cn(
-                    'w-full text-left flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-all duration-150 group cursor-pointer',
+                    'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-all duration-150 group cursor-pointer relative',
                     isActive
                       ? 'bg-amber-50 text-amber-900 font-bold border border-amber-300 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100'
                   )}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                  <div className="flex items-center gap-2.5 min-w-0 pr-1 flex-1">
                     <MessageSquare
                       className={cn(
                         'w-4 h-4 shrink-0 transition-colors',
@@ -152,13 +168,17 @@ export const Sidebar: React.FC = () => {
                     />
                     <span className="truncate">{s.title || 'Untitled Query'}</span>
                   </div>
-                  <ChevronRight
-                    className={cn(
-                      'w-3.5 h-3.5 shrink-0 transition-opacity',
-                      isActive ? 'opacity-100 text-amber-600' : 'opacity-0 group-hover:opacity-100 text-slate-400'
-                    )}
-                  />
-                </button>
+
+                  {/* Delete session button on hover / active */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteSession(e, s.session_id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-slate-200/60 rounded transition-all cursor-pointer shrink-0 ml-1"
+                    title="Delete session"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               )
             })
           ) : (

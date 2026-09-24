@@ -14,8 +14,16 @@ class QueryExpanderService:
         2. Translates non-English procurement queries to standard English.
         3. Enriches query with BIS technical domain terminology, material grades, and test methods.
         """
-        # Fallback default
-        default_lang = user_language or ("Hindi" if any(ord(c) > 0x0900 and ord(c) < 0x097F for c in raw_input) else "English")
+        # Fallback default (check Gujarati 0x0A80-0x0AFF, Devanagari/Hindi 0x0900-0x097F)
+        if user_language:
+            default_lang = user_language
+        elif any(ord(c) >= 0x0A80 and ord(c) <= 0x0AFF for c in raw_input):
+            default_lang = "Gujarati"
+        elif any(ord(c) >= 0x0900 and ord(c) <= 0x097F for c in raw_input):
+            default_lang = "Hindi"
+        else:
+            default_lang = "English"
+
         default_result = {
             "expanded_query": raw_input,
             "detected_language": default_lang,
@@ -30,7 +38,7 @@ class QueryExpanderService:
         User Specified Language (if provided): "{user_language or 'Auto-Detect'}"
 
         Instructions:
-        1. Identify the language of the query (e.g., "English", "Hindi", "Tamil", "Marathi", "Bengali", "Telugu", etc.).
+        1. Identify the language of the query (e.g., "English", "Hindi", "Gujarati", "Tamil", "Marathi", "Bengali", "Telugu", etc.).
         2. Translate the query into accurate English procurement terms if it is not already in English.
         3. Formulate an enriched technical search string in English containing:
            - Specific product categories and synonyms

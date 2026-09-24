@@ -21,7 +21,7 @@ async def recommend(
     user_id: str = Form(..., description="User ID associated with the session"),
     query_text: Optional[str] = Form(None, description="Optional text query or procurement prompt"),
     file: Optional[UploadFile] = File(None, description="Optional PDF, DOCX, TXT, or image tender document upload"),
-    language: Optional[str] = Form(None, description="Optional preferred output language (e.g. 'Hindi', 'Tamil', 'English')"),
+    language: Optional[str] = Form(None, description="Optional preferred output language (e.g. 'Hindi', 'Gujarati', 'Tamil', 'English')"),
     conn: Connection = Depends(get_db_connection)
 ):
     if not query_text and not file:

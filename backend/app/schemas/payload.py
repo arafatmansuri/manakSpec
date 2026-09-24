@@ -8,3 +8,4 @@ class SearchQueryRequest(BaseModel):
 class TextRecommendationRequest(BaseModel):
     query_text: str = Field(..., description="Query string or product specification text")
     session_id: Optional[str] = Field(None, description="Optional UUID to append to existing conversation thread")
+    language: Optional[str] = Field("English", description="Target response language (e.g. 'English', 'Hindi')")

@@ -25,12 +25,15 @@ class SynthesisGeneratorService:
         self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
         self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
 
-    def _build_prompt(self, query: str, context: Dict[str, Any], history: List[Dict[str, str]]) -> str:
+    def _build_prompt(self, query: str, context: Dict[str, Any], history: List[Dict[str, str]], target_language: str = "English") -> str:
         history_str = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in history])
         
         return f"""
-        You are an expert AI assistant specialized in Bureau of Indian Standards (BIS) procurement.
+        You are an expert AI assistant specialized in Bureau of Indian Standards (BIS) procurement and Indian Government Tender Drafting.
         
+        Language Preference: {target_language}
+        (Note: If {target_language} is non-English, draft the executive overview and descriptive tender explanations in {target_language} while preserving standard numbers like IS 16106:2023 and technical SI units intact).
+
         Conversation History:
         {history_str}
 
@@ -40,21 +43,32 @@ class SynthesisGeneratorService:
         Primary Standards: {context.get('primary_standards', [])}
         Allied References: {context.get('allied_references', [])}
 
-        Task: Provide a structured recommendation considering the ongoing context.
+        Classification Directive for Allied References:
+        Categorize each item in 'allied_references' into one of these exact relation_type categories:
+        - "Test Method" (for sampling, testing, chemical/mechanical analysis)
+        - "Safety Standard" (for fire, shock, hazardous materials, electric protection)
+        - "Terminology Standard" (for definitions, glossary, symbols)
+        - "Installation / Code of Practice" (for erection, laying, maintenance guidelines)
+        - "Related Product Standard" (for complementary parts, fittings, raw materials)
+        - "Normative Reference" (general normative citations)
+
+        Task: Provide a structured recommendation and ready-to-use tender specification clauses.
         """
 
-    def _build_system_instruction(self) -> str:
-        return """
+    def _build_system_instruction(self, target_language: str = "English") -> str:
+        return f"""
         You are an expert AI assistant specialized in Bureau of Indian Standards (BIS) and Indian Government Procurement Quality Control Orders (QCO).
         You must analyze the user specification and return a structured JSON matching the required schema.
+        Language requirement: Output explanations in {target_language} if specified, keeping standard IS codes intact.
         Ensure all certification details, normative references, and tender clause items are extracted cleanly into lists and key-value fields.
         """
 
     async def generate_response(
-        self, query: str, context: Dict[str, Any], history: List[Dict[str, str]]
+        self, query: str, context: Dict[str, Any], history: List[Dict[str, str]], target_language: str = "English"
     ) -> Tuple[StructuredSynthesisSchema, str]:
         prompt = f"""
         User Specification Query: "{query}"
+        Target Response Language: {target_language}
 
         Retrieved Database Context:
         Primary Standards: {context.get('primary_standards', [])}
@@ -70,7 +84,7 @@ class SynthesisGeneratorService:
                 model=settings.PRIMARY_LLM_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=self._build_prompt(query, context, history),
+                    system_instruction=self._build_prompt(query, context, history, target_language=target_language),
                     response_mime_type="application/json",
                     response_schema=gemini_safe_schema,
                 )
@@ -85,7 +99,7 @@ class SynthesisGeneratorService:
             # Provide explicit schema in failover prompt to prevent structure mismatch
             json_schema_str = json.dumps(raw_schema)
             groq_system_msg = (
-                f"{self._build_system_instruction()}\n"
+                f"{self._build_system_instruction(target_language=target_language)}\n"
                 f"Required Output JSON Schema:\n{json_schema_str}\n"
                 "Return ONLY valid JSON matching this schema."
             )
@@ -95,7 +109,7 @@ class SynthesisGeneratorService:
             groq_response = self.groq_client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": groq_system_msg},
-                    {"role": "user", "content": f"{self._build_prompt(query, context, history)}\n\n{prompt}"}
+                    {"role": "user", "content": f"{self._build_prompt(query, context, history, target_language=target_language)}\n\n{prompt}"}
                 ],
                 model=failover_model,
                 response_format={"type": "json_object"}

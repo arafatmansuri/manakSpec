@@ -2,7 +2,7 @@ import io
 import zipfile
 import uuid
 import json
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, BackgroundTasks, Response
 from asyncpg import Connection, Pool
 from typing import Dict, Optional, Any, List
 from app.core.db import get_db_connection,get_db_pool
@@ -10,6 +10,7 @@ from app.schemas.response import RecommendationOutput
 from app.services.session_service import session_service
 from app.services.parser import document_parser
 from app.services.ingester import bis_ingester
+from app.services.exporter import tender_exporter
 from app.agent.workflow import agent_executor
 
 router = APIRouter()
@@ -19,18 +20,19 @@ async def recommend(
     session_id: str = Form(..., description="UUID of the active chat session"),
     user_id: str = Form(..., description="User ID associated with the session"),
     query_text: Optional[str] = Form(None, description="Optional text query or procurement prompt"),
-    file: Optional[UploadFile] = File(None, description="Optional PDF or image tender document upload"),
+    file: Optional[UploadFile] = File(None, description="Optional PDF, DOCX, TXT, or image tender document upload"),
+    language: Optional[str] = Form(None, description="Optional preferred output language (e.g. 'Hindi', 'Tamil', 'English')"),
     conn: Connection = Depends(get_db_connection)
 ):
     if not query_text and not file:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please provide a query text, attach a document (PDF/Image), or both."
+            detail="Please provide a query text, attach a document (PDF/DOCX/TXT/Image), or both."
         )
 
     extracted_file_text = ""
     
-    # 1. Document Extraction
+    # 1. Document Extraction (.pdf, .docx, .txt, images)
     if file:
         contents = await file.read()
         filename = file.filename.lower() if file.filename else ""
@@ -39,10 +41,14 @@ async def recommend(
             extracted_file_text = document_parser.extract_text_from_pdf(contents)
         elif filename.endswith((".png", ".jpg", ".jpeg")):
             extracted_file_text = document_parser.extract_text_from_image(contents)
+        elif filename.endswith(".docx"):
+            extracted_file_text = document_parser.extract_text_from_docx(contents)
+        elif filename.endswith((".txt", ".csv")):
+            extracted_file_text = document_parser.extract_text_from_txt(contents)
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unsupported file format. Please upload PDF or image files."
+                detail="Unsupported file format. Please upload PDF, Word (.docx), TXT, or image files."
             )
 
         if not extracted_file_text and not query_text:
@@ -72,11 +78,14 @@ async def recommend(
         # Log User Query
         await session_service.save_message(conn, active_session_id, "user", full_prompt)
 
-        # 4. Invoke Agent Execution Graph
+        # 4. Invoke Agent Execution Graph with Multilingual Context
         initial_state = {
             "raw_query": full_prompt,
             "chat_history": chat_history,
             "expanded_query": "",
+            "detected_language": "",
+            "target_language": language or "",
+            "english_query": "",
             "retrieved_data": {},
             "final_output": None,
             "execution_provider": "",
@@ -85,6 +94,7 @@ async def recommend(
         
         result = await agent_executor.ainvoke(initial_state)
         structured_synthesis = result["final_output"]
+        detected_language = result.get("detected_language", "English")
 
         # 5. Auto-Title Session (First Turn Check)
         if current_title in [None, "New Chat", ""]:
@@ -112,8 +122,8 @@ async def recommend(
         return RecommendationOutput(
             session_id=active_session_id,
             user_id=verified_user_id,
+            detected_language=detected_language,
             query_expansion_used=result["expanded_query"],
-            # primary_standards=result["retrieved_data"]["primary_standards"],
             allied_references=result["retrieved_data"]["allied_references"],
             structured_synthesis=structured_synthesis,
             execution_provider=result["execution_provider"]
@@ -123,6 +133,142 @@ async def recommend(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing procurement request: {str(e)}"
+        )
+
+
+@router.get("/export/message/{message_id}")
+async def export_tender_message(
+    message_id: str,
+    format: str = "docx",
+    conn: Connection = Depends(get_db_connection)
+):
+    """
+    Direct alias endpoint to export a specific chat message/response by message_id
+    into PDF, DOCX, TXT, or Markdown formats.
+    """
+    return await export_tender_schedule(identifier=message_id, format=format, conn=conn)
+
+
+@router.get("/export/{identifier}")
+async def export_tender_schedule(
+    identifier: str,
+    chat_id: Optional[str] = None,
+    format: str = "docx",
+    conn: Connection = Depends(get_db_connection)
+):
+    """
+    Exports a BIS technical recommendation and tender specification schedule 
+    as a downloadable PDF, Word (.docx), Plain Text (.txt), or Markdown (.md) document.
+
+    Can accept:
+    - identifier: either a specific chat_id/message_id (e.g. '12') OR a session UUID.
+    - chat_id (optional query param): explicitly specifies which message/response turn to download.
+    - format: 'pdf', 'docx', 'txt', or 'md' (default: 'docx')
+    """
+    # 1. Determine whether fetching a specific message (chat_id) or the latest message of a session
+    target_message_id = None
+    if chat_id and chat_id.strip():
+        target_message_id = chat_id.strip()
+    elif identifier.strip().isdigit():
+        target_message_id = identifier.strip()
+
+    if target_message_id is not None:
+        # Fetch specific response turn by message ID
+        query = """
+            SELECT 
+                cm.id, 
+                cm.session_id, 
+                cm.role, 
+                cm.content, 
+                COALESCE(cs.title, 'Tender BIS Specification Schedule') as title
+            FROM chat_messages cm
+            LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
+            WHERE cm.id = $1::integer;
+        """
+        row = await conn.fetchrow(query, int(target_message_id))
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail=f"Chat message with ID '{target_message_id}' not found."
+            )
+        if row["role"] != "assistant":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Message '{target_message_id}' is a user query, not an assistant recommendation."
+            )
+    else:
+        # Fetch latest assistant recommendation for the session_id
+        query = """
+            SELECT 
+                cm.id, 
+                cm.session_id, 
+                cm.role, 
+                cm.content, 
+                COALESCE(cs.title, 'Tender BIS Specification Schedule') as title
+            FROM chat_messages cm
+            LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
+            WHERE cm.session_id = $1::uuid AND cm.role = 'assistant'
+            ORDER BY cm.created_at DESC 
+            LIMIT 1;
+        """
+        try:
+            row = await conn.fetchrow(query, identifier)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid identifier '{identifier}'. Please provide a valid session UUID or message integer ID."
+            )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail=f"No generated recommendation found for session '{identifier}'."
+            )
+
+    # 2. Parse synthesis content
+    raw_content = row["content"]
+    if isinstance(raw_content, str):
+        try:
+            content_data = json.loads(raw_content)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Failed to parse saved session recommendation.")
+    else:
+        content_data = raw_content
+
+    # 3. Format filename
+    title = row["title"] or "Tender BIS Specification Schedule"
+    safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")[:35] or "Tender_BIS_Spec"
+    msg_id = row["id"]
+    filename_base = f"{safe_title}_chat_{msg_id}"
+
+    # 4. Generate requested format: PDF, DOCX, TXT, or MD
+    fmt = format.lower().strip()
+    if fmt == "pdf":
+        pdf_bytes = tender_exporter.generate_pdf(content_data, title=title)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.pdf"'}
+        )
+    elif fmt == "docx":
+        docx_bytes = tender_exporter.generate_docx(content_data, title=title)
+        return Response(
+            content=docx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.docx"'}
+        )
+    elif fmt == "txt":
+        txt_content = tender_exporter.generate_text(content_data, title=title)
+        return Response(
+            content=txt_content,
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.txt"'}
+        )
+    else:
+        md_text = tender_exporter.generate_markdown(content_data, title=title)
+        return Response(
+            content=md_text,
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.md"'}
         )
 # In-memory status store for bulk jobs
 ingestion_jobs_db: Dict[str, Dict[str, Any]] = {}

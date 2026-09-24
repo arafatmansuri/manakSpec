@@ -83,7 +83,7 @@ class PrimaryStandardSchema(BaseModel):
 
 class AlliedReferenceSchema(BaseModel):
     parent_is_number: str
-    relation_type: str = Field(..., description="Type of reference: Test Method, Safety, EMC, Normative Reference, Amendment, etc.")
+    relation_type: str = Field(..., description="Categorized relation: Test Method, Safety Standard, Terminology Standard, Installation / Code of Practice, Related Product Standard, or Normative Reference")
     related_is_number: Optional[str] = None
     title_or_description: str
     amendment_no: Optional[int] = Field(None, description="Amendment number if applicable")
@@ -112,6 +112,7 @@ class StructuredSynthesisSchema(BaseModel):
 class RecommendationOutput(BaseModel):
     session_id: str = Field(..., description="UUID of the chat session where this message was logged")
     user_id: str = Field(..., description="User ID associated with the session")
+    detected_language: Optional[str] = Field("English", description="Identified language of input query")
     query_expansion_used: str
     # primary_standards: List[PrimaryStandardSchema]
     allied_references: List[AlliedReferenceSchema]

@@ -59,8 +59,50 @@ class BISExtractorService:
         return text[:1000].strip()
 
     @staticmethod
+    def classify_relation_type(title_or_desc: str) -> str:
+        """
+        Classifies standard references into distinct BIS procurement categories:
+        - Test Method
+        - Safety Standard
+        - Terminology Standard
+        - Installation / Code of Practice
+        - Related Product Standard
+        - Normative Reference
+        """
+        if not title_or_desc:
+            return "Normative Reference"
+
+        lower = title_or_desc.lower()
+        if any(w in lower for w in [
+            "test", "testing", "method of test", "methods of test", "determination of", 
+            "measurement of", "sampling", "chemical analysis", "mechanical testing", "assay"
+        ]):
+            return "Test Method"
+        if any(w in lower for w in [
+            "safety", "fire", "flame", "shock", "hazard", "protection against", "explosion", 
+            "electric shock", "earthing", "flammability"
+        ]):
+            return "Safety Standard"
+        if any(w in lower for w in [
+            "glossary", "terminology", "vocabulary", "symbols", "definitions", "nomenclature"
+        ]):
+            return "Terminology Standard"
+        if any(w in lower for w in [
+            "installation", "code of practice", "laying", "maintenance", "erection", 
+            "guidelines for", "inspection and maintenance", "application guide"
+        ]):
+            return "Installation / Code of Practice"
+        if any(w in lower for w in [
+            "specification for", "dimensions", "fittings", "accessories", "components", 
+            "materials for", "steel for", "pipes for", "cables for"
+        ]):
+            return "Related Product Standard"
+
+        return "Normative Reference"
+
+    @staticmethod
     def extract_annex_a_references(text: str) -> List[Dict[str, str]]:
-        """Parses referenced IS codes under 'ANNEX A' or 'NORMATIVE REFERENCES'."""
+        """Parses referenced IS codes under 'ANNEX A' or 'NORMATIVE REFERENCES' and classifies their relationship."""
         annex_pattern = r"(?:ANNEX\s+A|NORMATIVE\s+REFERENCES)([\s\S]*?)(?=\n\s*ANNEX|\n\s*\d+\s+[A-Z]|$)"
         match = re.search(annex_pattern, text, re.IGNORECASE)
         
@@ -71,8 +113,9 @@ class BISExtractorService:
         for m in matches:
             ref_code = m.group(1).strip()
             ref_desc = m.group(2).strip()
+            rel_type = BISExtractorService.classify_relation_type(ref_desc)
             references.append({
-                "relation_type": "Normative Reference",
+                "relation_type": rel_type,
                 "related_is_number": ref_code,
                 "title_or_description": ref_desc
             })

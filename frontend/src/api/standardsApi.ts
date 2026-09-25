@@ -51,7 +51,7 @@ export const standardsApi = {
     return res.data
   },
 
-  ingestStandard: async (formData: FormData): Promise<any> => {
+  ingestStandard: async (formData: FormData) => {
     const res = await apiClient.post('/standards/ingest', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -60,7 +60,7 @@ export const standardsApi = {
     return res.data
   },
 
-  ingestBulk: async (formData: FormData): Promise<any> => {
+  ingestBulk: async (formData: FormData) => {
     const res = await apiClient.post('/standards/ingest-bulk', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',

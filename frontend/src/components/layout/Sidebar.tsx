@@ -53,8 +53,8 @@ export const Sidebar: React.FC = () => {
         dispatch(setActiveSessionId(null))
         navigate('/')
       }
-    } catch (err: any) {
-      dispatch(addToast({ message: `Delete failed: ${err.message}`, type: 'error' }))
+    } catch {
+      dispatch(addToast({ message: `Unable to delete session`, type: 'error' }))
     }
   }
 

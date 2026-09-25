@@ -69,8 +69,8 @@ export const IngestModal: React.FC = () => {
       await standardsApi.ingestStandard(formData)
       dispatch(addToast({ message: `Successfully ingested standard ${isNumber || file.name}!`, type: 'success' }))
       handleClose()
-    } catch (err: any) {
-      dispatch(addToast({ message: `Ingestion failed: ${err.message}`, type: 'error' }))
+    } catch{
+      dispatch(addToast({ message: `Unable to ingest standard`, type: 'error' }))
     } finally {
       setIsSubmitting(false)
     }
@@ -111,8 +111,8 @@ export const IngestModal: React.FC = () => {
       await standardsApi.ingestBulk(formData)
       dispatch(addToast({ message: `Bulk ingestion queued for ${bulkFiles.length} file(s)!`, type: 'success' }))
       handleClose()
-    } catch (err: any) {
-      dispatch(addToast({ message: `Bulk ingestion failed: ${err.message}`, type: 'error' }))
+    } catch {
+      dispatch(addToast({ message: `Unable to ingest standards in bulk`, type: 'error' }))
     } finally {
       setIsSubmitting(false)
     }

@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { setSidebarOpen, setActiveModal, addToast } from '@/store/slices/uiSlice'
 import { setActiveSessionId } from '@/store/slices/sessionSlice'
 import { useUserSessions, useCreateSession, useDeleteSession } from '@/hooks/useSessions'
-import { Plus, MessageSquare, BookOpen, Clock, ShieldCheck, FileCheck2, X, UploadCloud, Trash2 } from 'lucide-react'
+import { Plus, MessageSquare, Clock, ShieldCheck, FileCheck2, X, UploadCloud, Trash2 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 export const Sidebar: React.FC = () => {
@@ -99,14 +99,14 @@ export const Sidebar: React.FC = () => {
 
         {/* Quick Links */}
         <div className="p-3 border-b border-slate-100 space-y-1">
-          <Link
+          {/* <Link
             to="/standards"
             onClick={() => window.innerWidth < 1024 && dispatch(setSidebarOpen(false))}
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition-colors"
           >
             <BookOpen className="w-4 h-4 text-blue-600" />
             <span>BIS Standards & QCOs</span>
-          </Link>
+          </Link> */}
           <Link
             to="/history"
             onClick={() => window.innerWidth < 1024 && dispatch(setSidebarOpen(false))}

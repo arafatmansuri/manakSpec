@@ -2,18 +2,18 @@ import React from 'react'
 import { useAppDispatch } from '@/store/hooks'
 import { toggleSidebar, setActiveModal } from '@/store/slices/uiSlice'
 // import { setPreferredLanguage } from '@/store/slices/sessionSlice'
-import { Menu, ShieldCheck, Sparkles, BookOpen, Clock, UploadCloud } from 'lucide-react'
+import { Menu, ShieldCheck, Sparkles, Clock, UploadCloud } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
-export const LANGUAGES = [
-  { code: 'English', label: 'English' },
-  { code: 'Hindi', label: 'हिंदी (Hindi)' },
-  { code: 'Gujarati', label: 'ગુજરાતી (Gujarati)' },
-  { code: 'Tamil', label: 'தமிழ் (Tamil)' },
-  { code: 'Telugu', label: 'తెలుగు (Telugu)' },
-  { code: 'Bengali', label: 'বাংলা (Bengali)' },
-  { code: 'Marathi', label: 'मराठी (Marathi)' },
-]
+// export const LANGUAGES = [
+//   { code: 'English', label: 'English' },
+//   { code: 'Hindi', label: 'हिंदी (Hindi)' },
+//   { code: 'Gujarati', label: 'ગુજરાતી (Gujarati)' },
+//   { code: 'Tamil', label: 'தமிழ் (Tamil)' },
+//   { code: 'Telugu', label: 'తెలుగు (Telugu)' },
+//   { code: 'Bengali', label: 'বাংলা (Bengali)' },
+//   { code: 'Marathi', label: 'मराठी (Marathi)' },
+// ]
 
 export const Header: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -32,7 +32,7 @@ export const Header: React.FC = () => {
         </button>
 
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-blue-600 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200">
+          <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-amber-500 to-blue-600 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200">
             <ShieldCheck className="w-5 h-5 text-white font-bold" />
           </div>
           <div>
@@ -63,7 +63,7 @@ export const Header: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>Assistant</span>
           </Link>
-          <Link
+          {/* <Link
             to="/standards"
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${location.pathname === '/standards'
               ? 'bg-amber-50 text-amber-800 font-semibold border border-amber-200/60'
@@ -72,7 +72,7 @@ export const Header: React.FC = () => {
           >
             <BookOpen className="w-3.5 h-3.5 text-blue-600" />
             <span>BIS Catalog</span>
-          </Link>
+          </Link> */}
           <Link
             to="/history"
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${location.pathname === '/history'

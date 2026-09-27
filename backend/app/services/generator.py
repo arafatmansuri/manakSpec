@@ -40,8 +40,30 @@ class SynthesisGeneratorService:
         Current User Query: "{query}"
 
         Retrieved Standard Context:
-        Primary Standards: {context.get('primary_standards', [])}
+        DB Standards (retrieved from database, may or may not be relevant): {context.get('primary_standards', [])}
+        Web-Sourced Standards (supplementary, from live web search): {context.get('web_standards', [])}
         Allied References: {context.get('allied_references', [])}
+
+        CRITICAL RELEVANCE FILTER — YOU MUST FOLLOW THESE RULES EXACTLY:
+        1. Critically evaluate EVERY standard in "DB Standards" against the user query "{query}".
+           Include a DB standard in primary_standards_summary ONLY IF it is genuinely and directly
+           applicable to the queried product, material, or domain. Discard any DB standard that
+           is unrelated, even if it was retrieved.
+        2. If "Web-Sourced Standards" are provided, treat them as primary candidates.
+           For EACH web-sourced standard, evaluate if it is relevant to the query.
+           All relevant web-sourced standards MUST be included in primary_standards_summary
+           — populate all available fields (is_number, title, publication_year, status,
+           scope_text, is_mandatory_qco, scheme_type) from the data provided.
+           Set similarity_score to 0.0 for web-sourced standards.
+        3. Merge DB-relevant + web-relevant standards into a single primary_standards_summary list.
+           Deduplicate by is_number if the same standard appears in both.
+        4. If NO standard from either source is applicable to the query, you MUST:
+           - Return primary_standards_summary as an empty list [].
+           - Write an overview clearly stating "No applicable BIS/IS standards could be
+             identified for [the queried product/domain]."
+        5. NEVER fabricate, invent, or guess IS numbers or titles. Only include standards
+           explicitly provided in "DB Standards" or "Web-Sourced Standards" above.
+           Web-sourced standards are NOT fabrication — they are real search results.
 
         Classification Directive for Allied References:
         Categorize each item in 'allied_references' into one of these exact relation_type categories:
@@ -61,6 +83,9 @@ class SynthesisGeneratorService:
         You must analyze the user specification and return a structured JSON matching the required schema.
         Language requirement: Output explanations in {target_language} if specified, keeping standard IS codes intact.
         Ensure all certification details, normative references, and tender clause items are extracted cleanly into lists and key-value fields.
+        IMPORTANT: Only include standards in primary_standards_summary that are genuinely relevant to the user query.
+        If no standards are relevant, return primary_standards_summary as an empty list and explain in the overview.
+        Never fabricate IS numbers or titles.
         """
 
     async def generate_response(
@@ -70,8 +95,9 @@ class SynthesisGeneratorService:
         User Specification Query: "{query}"
         Target Response Language: {target_language}
 
-        Retrieved Database Context:
-        Primary Standards: {context.get('primary_standards', [])}
+        Retrieved Context:
+        DB Standards (from database, evaluate relevance carefully): {context.get('primary_standards', [])}
+        Web-Sourced Standards (supplementary): {context.get('web_standards', [])}
         Allied References: {context.get('allied_references', [])}
         """
         # Prepare Gemini-safe schema by scrubbing additionalProperties

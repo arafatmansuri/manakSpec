@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     # POSTGRES_PORT: int = 5432
     # POSTGRES_DB: str = "is_procurement"
     
-    
     # @property
     # def DATABASE_URL(self) -> str:
     #     return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -25,6 +24,7 @@ class Settings(BaseSettings):
 
     # Google Gemini API Settings
     GEMINI_API_KEY:str = os.getenv("GEMINI_API_KEY", "")
+    INGESTION_EMBEDDING_API_KEY:str = os.getenv("GEMINI_API_KEY_2","")
     EMBEDDING_MODEL: str = "gemini-embedding-001"
     PRIMARY_LLM_MODEL: str = "gemini-2.5-flash"
     

@@ -6,6 +6,7 @@ from typing import List
 class GeminiEmbedderService:
     def __init__(self):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.client2 = genai.Client(api_key=settings.INGESTION_EMBEDDING_API_KEY)
 
     def generate_embedding(self, text: str) -> List[float]:
         """Generates a 768-dim vector using gemini-embedding-001."""
@@ -26,7 +27,7 @@ class GeminiEmbedderService:
         if not text or not text.strip():
             return [0.0] * 768
 
-        response = self.client.models.embed_content(
+        response = self.client2.models.embed_content(
             model=settings.EMBEDDING_MODEL,
             contents=text,
             config=types.EmbedContentConfig(

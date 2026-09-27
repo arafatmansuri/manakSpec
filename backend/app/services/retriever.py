@@ -122,9 +122,15 @@ class StandardRetrieverService:
                 )
             allied_references.append(rel_dict)
 
+        max_similarity_score = max(
+            (s.get("similarity_score", 0.0) for s in primary_standards),
+            default=0.0
+        )
+
         return {
             "primary_standards": primary_standards,
-            "allied_references": allied_references
+            "allied_references": allied_references,
+            "max_similarity_score": max_similarity_score,
         }
 
 retriever_service = StandardRetrieverService()

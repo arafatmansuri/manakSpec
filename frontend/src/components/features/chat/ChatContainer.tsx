@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import type { ChatMessage } from '@/types/session'
 import { MessageItem } from './MessageItem'
-import { ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Sparkles, CheckCircle2 } from 'lucide-react'
 
 interface ChatContainerProps {
   messages: ChatMessage[]
@@ -38,7 +38,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-2xl mx-auto w-full space-y-6 animate-in fade-in duration-300">
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-blue-600 flex items-center justify-center shadow-md">
-          <ShieldCheck className="w-9 h-9 text-white font-bold" />
+          <img src="indispecLogo.jpeg" alt="indispec" className="w-full h-full object-cover rounded-xl" />
         </div>
 
         <div className="space-y-1.5">

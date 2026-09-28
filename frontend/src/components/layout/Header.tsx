@@ -2,7 +2,7 @@ import React from 'react'
 import { useAppDispatch } from '@/store/hooks'
 import { toggleSidebar, setActiveModal } from '@/store/slices/uiSlice'
 // import { setPreferredLanguage } from '@/store/slices/sessionSlice'
-import { Menu, ShieldCheck, Sparkles, Clock, UploadCloud } from 'lucide-react'
+import { Menu, Sparkles, Clock, UploadCloud } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 // export const LANGUAGES = [
@@ -33,7 +33,7 @@ export const Header: React.FC = () => {
 
         <Link to="/" className="flex items-center gap-2.5 group">
           <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-amber-500 to-blue-600 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200">
-            <ShieldCheck className="w-5 h-5 text-white font-bold" />
+            <img src="indispecLogo.jpeg" alt="indispec" className="w-full h-full object-cover rounded-xl" />
           </div>
           <div>
             <div className="flex items-center gap-2">

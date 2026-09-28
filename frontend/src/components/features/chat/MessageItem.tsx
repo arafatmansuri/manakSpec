@@ -76,7 +76,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, sessionId }) 
       <div className="flex-1 space-y-4 max-w-3xl">
         {/* Assistant Header */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-800">ManakSpec BIS Intelligence</span>
+          <span className="text-xs font-bold text-slate-800">IndiSpec BIS Intelligence</span>
           {message.execution_provider && (
             <Badge variant="ai" size="sm">
               {message.execution_provider}

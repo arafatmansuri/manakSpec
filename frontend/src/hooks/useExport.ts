@@ -10,7 +10,7 @@ export function useExport() {
   const exportDocument = async (
     identifier: string,
     format: 'pdf' | 'docx' | 'txt' | 'md' = 'docx',
-    filenamePrefix: string = 'ManakSpec_Tender_Clause'
+    filenamePrefix: string = 'IndiSpec_Tender_Clause'
   ) => {
     try {
       setIsExporting(true)

@@ -38,7 +38,7 @@ export const Header: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-base tracking-tight text-slate-900">
-                MANAK<span className="text-amber-500">SPEC</span>
+                INDI<span className="text-amber-500">SPEC</span>
               </span>
               <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
                 BIS AI

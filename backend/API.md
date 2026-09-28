@@ -1,4 +1,4 @@
-# ManakSpec Backend API Documentation
+# IndiSpec Backend API Documentation
 
 An AI-powered recommendation and tender drafting engine for identifying applicable Bureau of Indian Standards (BIS) and Quality Control Orders (QCO) for government and enterprise procurement specifications.
 

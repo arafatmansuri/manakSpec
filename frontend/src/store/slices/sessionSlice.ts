@@ -8,10 +8,10 @@ interface SessionState {
 
 const getStoredUserId = (): string => {
   try {
-    const existing = localStorage.getItem('manak_user_id')
+    const existing = localStorage.getItem('indi_user_id')
     if (existing) return existing
     const generated = `user_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString(36)}`
-    localStorage.setItem('manak_user_id', generated)
+    localStorage.setItem('indi_user_id', generated)
     return generated
   } catch {
     return 'default_user'
@@ -31,7 +31,7 @@ export const sessionSlice = createSlice({
     setUserId: (state, action: PayloadAction<string>) => {
       state.userId = action.payload
       try {
-        localStorage.setItem('manak_user_id', action.payload)
+        localStorage.setItem('indi_user_id', action.payload)
       } catch {
         // ignore storage errors
       }

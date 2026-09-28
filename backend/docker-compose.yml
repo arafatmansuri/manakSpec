@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: manakspec-backend
+    container_name: indispec-backend
     restart: unless-stopped
     ports:
       # Bind to 127.0.0.1 so only the local Nginx reverse proxy can reach it directly
